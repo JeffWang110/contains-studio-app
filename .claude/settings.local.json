@@ -5,7 +5,9 @@
       "Bash(powershell:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(dir /b:*)",
+      "Bash(dir /s /b \"api\"\")"
     ]
   }
 }

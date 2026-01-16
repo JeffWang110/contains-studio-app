@@ -1,7 +1,7 @@
 {
-  "name": "contains-studio-agents",
-  "version": "1.0.0",
-  "description": "Contains Studio AI Agents 部門介面",
+  "name": "ai-agents-studio",
+  "version": "2.0.0",
+  "description": "AI Agents Studio - 中華電信 × 台積電 專案管理平台",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
