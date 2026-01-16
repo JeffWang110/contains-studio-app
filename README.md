@@ -1,5 +1,4 @@
-# AI Agents Studio - 中華電信 × 台積電 專案管理平台
-
+# AI Agents Studio
 基於 [Contains Studio Agents](https://github.com/contains-studio/agents) 專案客製化，整合 Google Gemini AI。
 
 ## 🚀 功能特色
