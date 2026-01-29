@@ -1,3 +1,8 @@
+---
+name: party
+description: 管理和維護 party-rsvp 入厝趴時間調查網站。當需要修改 party.jeffwang.work 網站、查詢 Firebase 資料、部署更新、或了解專案架構時使用此技能。
+---
+
 # Party RSVP 網站管理技能
 
 這個技能用於管理和維護 party-rsvp 入厝趴時間調查網站。
