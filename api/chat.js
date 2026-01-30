@@ -1,11 +1,53 @@
 // Vercel Serverless Function - 安全呼叫 Gemini API
 // 路徑: /api/chat.js
 
+// 簡易速率限制（記憶體內，每個實例獨立）
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 分鐘
+const RATE_LIMIT_MAX = 20; // 每分鐘最多 20 次請求
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now - record.startTime > RATE_LIMIT_WINDOW) {
+    rateLimitMap.set(ip, { startTime: now, count: 1 });
+    return true;
+  }
+
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
+// 輸入驗證常數
+const MAX_MESSAGE_LENGTH = 5000;
+const MAX_FIELD_LENGTH = 200;
+const VALID_AGENT_NAME_PATTERN = /^[a-z0-9-]+$/;
+
 export default async function handler(req, res) {
-  // 設定 CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // 設定 CORS - 只允許特定網域
+  const allowedOrigins = [
+    'https://agents.jeffwang.work',
+    'https://contains-studio-app.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // 安全標頭
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
 
   // 處理 CORS preflight
   if (req.method === 'OPTIONS') {
@@ -17,6 +59,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // 速率限制檢查
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return res.status(429).json({ error: '請求過於頻繁，請稍後再試' });
+  }
+
   try {
     // 解析 body（處理已解析和未解析的情況）
     let body = req.body;
@@ -24,21 +72,39 @@ export default async function handler(req, res) {
       try {
         body = JSON.parse(body);
       } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
+        return res.status(400).json({ error: '無效的請求格式' });
       }
     }
 
     const { message, agentName, agentTitle, agentDesc } = body;
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message is required' });
+    // 輸入驗證
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: '訊息為必填欄位' });
+    }
+
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: `訊息長度不可超過 ${MAX_MESSAGE_LENGTH} 字元` });
+    }
+
+    if (agentName && (typeof agentName !== 'string' || !VALID_AGENT_NAME_PATTERN.test(agentName))) {
+      return res.status(400).json({ error: '無效的 Agent 名稱' });
+    }
+
+    if (agentTitle && (typeof agentTitle !== 'string' || agentTitle.length > MAX_FIELD_LENGTH)) {
+      return res.status(400).json({ error: '無效的 Agent 標題' });
+    }
+
+    if (agentDesc && (typeof agentDesc !== 'string' || agentDesc.length > MAX_FIELD_LENGTH)) {
+      return res.status(400).json({ error: '無效的 Agent 描述' });
     }
 
     // 從環境變數取得 API Key（安全）
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
+      console.error('GEMINI_API_KEY not configured');
+      return res.status(500).json({ error: '服務暫時無法使用' });
     }
 
     // 建立 Agent 專屬的 System Prompt
@@ -78,9 +144,9 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Gemini API Error:', errorData);
-      return res.status(response.status).json({ 
-        error: 'Gemini API error', 
-        details: errorData 
+      // 生產環境不暴露詳細錯誤
+      return res.status(response.status).json({
+        error: 'AI 服務暫時無法回應，請稍後再試'
       });
     }
 
@@ -93,7 +159,8 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Server error:', error);
-    return res.status(500).json({ error: 'Internal server error', message: error.message });
+    // 生產環境不暴露詳細錯誤
+    return res.status(500).json({ error: '伺服器發生錯誤，請稍後再試' });
   }
 }
 
