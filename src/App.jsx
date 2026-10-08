@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { scenarios, skillCatalog, skillsByDept } from './skillCatalog';
 
 // Stripe 付費牆組件
 const StripePaymentLink = ({ url }) => (
@@ -210,6 +211,8 @@ const INITIAL_FEEDBACK_FORM = {
 function App() {
   const [selectedDept, setSelectedDept] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [scenario, setScenario] = useState('build');
+  const [selectedSkills, setSelectedSkills] = useState([]);
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [feedbackForm, setFeedbackForm] = useState(INITIAL_FEEDBACK_FORM);
@@ -252,6 +255,9 @@ function App() {
           agentName: selectedAgent.name,
           agentTitle: selectedAgent.title,
           agentDesc: selectedAgent.desc,
+          deptId: selectedDept,
+          scenario,
+          skills: selectedSkills,
         }),
       });
 
@@ -418,6 +424,10 @@ function App() {
 
         {/* Input Area */}
         <div className="border-t bg-white p-4">
+          <div className="max-w-4xl mx-auto mb-3 text-sm text-gray-600">
+            <span>情境：{scenarios[scenario]}　方法：{selectedSkills.length ? selectedSkills.join('、') : '不指定'}</span>
+            <p className="text-xs mt-1">僅供聊天方法參考，未執行 Hermes 技能；返回部門頁可調整。</p>
+          </div>
           <div className="max-w-4xl mx-auto flex gap-3">
             <input
               type="text"
@@ -497,11 +507,37 @@ function App() {
                     <h3 className="font-bold text-gray-800 text-lg">{agent.title}</h3>
                     <p className="text-xs text-gray-400 font-mono truncate">{agent.name}</p>
                     <p className="text-sm text-gray-600 mt-2 line-clamp-2">{agent.desc}</p>
+                    <p className="text-xs text-amber-700 mt-3">✦ {dept.name} · 適合討論與規劃</p>
                   </div>
                 </div>
               </button>
             ))}
           </div>
+          <section aria-label="綜合任務選擇" className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 md:p-7">
+            <p className="text-xs font-semibold tracking-widest text-amber-800">TASK STUDIO / 自選方法</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-800">讓角色帶著你選的方法，一起處理任務</h2>
+            <p className="mt-2 text-sm text-slate-600">先選情境、再複選技能建議，最後點上方角色卡開始聊天。本站只傳送方法摘要，不會執行 Hermes 工具或跨角色自動派工。</p>
+            <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="工作情境">
+              {Object.entries(scenarios).map(([id, label]) => (
+                <button key={id} type="button" aria-pressed={scenario === id}
+                  onClick={() => { setScenario(id); if (id !== 'build') setSelectedSkills(prev => prev.filter(skill => skill !== 'ponytail')); }}
+                  className={`rounded-full px-4 py-2 text-sm border transition ${scenario === id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-amber-300 hover:border-slate-700'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-2" role="group" aria-label="技能建議">
+              {(skillsByDept[dept.id] || []).length ? skillsByDept[dept.id].map(skill => (
+                <label key={skill} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white p-3 cursor-pointer hover:border-amber-500">
+                  <input type="checkbox" className="mt-1 accent-amber-700" checked={selectedSkills.includes(skill)}
+                    disabled={skill === 'ponytail' && scenario !== 'build'}
+                    onChange={() => setSelectedSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill])} />
+                  <span className="text-sm text-slate-700"><strong className="block text-slate-900">{skill}</strong>{skillCatalog[skill]}{skill === 'ponytail' && scenario !== 'build' ? '（限開發實作）' : ''}</span>
+                </label>
+              )) : <p className="text-sm text-slate-600">此部門暫無經人工確認的技能建議；健康建議請諮詢專業人士。</p>}
+            </div>
+            <p className="mt-4 text-xs text-slate-600">推薦清單為本站人工編排，非角色官方認證；不含使用次數或有效利用率宣稱。未勾選時可直接對話。</p>
+          </section>
         </div>
       </div>
     );
@@ -548,7 +584,7 @@ function App() {
           {departments.map((dept) => (
             <button
               key={dept.id}
-              onClick={() => setSelectedDept(dept.id)}
+              onClick={() => { setSelectedSkills([]); setScenario('build'); setSelectedDept(dept.id); }}
               className="group relative overflow-hidden rounded-2xl bg-white/5 backdrop-blur border border-white/10 hover:border-white/30 p-6 text-left transition-all duration-300 hover:scale-[1.03] hover:bg-white/10"
             >
               <div className={`w-14 h-14 rounded-xl bg-gradient-to-r ${dept.color} flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
