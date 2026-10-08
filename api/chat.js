@@ -1,4 +1,5 @@
 // Vercel Serverless Function - 安全呼叫 Gemini API
+import { scenarios, skillCatalog, validateSkillSelection } from '../src/skillCatalog.js';
 // 路徑: /api/chat.js
 
 // 簡易速率限制（記憶體內，每個實例獨立）
@@ -76,7 +77,15 @@ export default async function handler(req, res) {
       }
     }
 
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({ error: '無效的請求格式' });
+    }
     const { message, agentName, agentTitle, agentDesc } = body;
+    // Backward-compatible for older clients: no selection means no extra method.
+    const hasSelection = ['deptId', 'scenario', 'skills'].some(key => Object.hasOwn(body, key));
+    if (hasSelection && !validateSkillSelection(body.deptId, body.scenario, body.skills)) {
+      return res.status(400).json({ error: '無效的技能選擇' });
+    }
 
     // 輸入驗證
     if (!message || typeof message !== 'string') {
@@ -108,7 +117,13 @@ export default async function handler(req, res) {
     }
 
     // 建立 Agent 專屬的 System Prompt
-    const systemPrompt = buildAgentPrompt(agentName, agentTitle, agentDesc);
+    let systemPrompt = buildAgentPrompt(agentName, agentTitle, agentDesc);
+    if (hasSelection) {
+      const chosen = body.skills.map(id => `${id}：${skillCatalog[id]}`).join('；');
+      systemPrompt += `\n使用者選擇的工作情境：${scenarios[body.scenario]}。`;
+      if (chosen) systemPrompt += `\n可參考的方法：${chosen}。`;
+      systemPrompt += '\n這些只是本站編輯整理的方法提示，並未安裝、載入或執行 Hermes 技能；不得宣稱已驗證、已呼叫工具或完成任務。保留安全邊界、必要測試與驗收，健康／金融／法律問題應提醒專業判斷。';
+    }
 
     // 呼叫 Gemini API
     const response = await fetch(
